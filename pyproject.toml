@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sla-modern-pro"
+version = "0.1.0"
+description = "Novo extrator de relatórios SLA para Zabbix, com consultas em lote e retry resiliente"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2.31.0",
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "jinja2>=3.1.0",
+  "python-multipart>=0.0.9",
+]
+
+[project.scripts]
+sla-modern-pro = "sla_modern_pro.cli:main"
+sla-modern-pro-web = "sla_modern_pro.web:run"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

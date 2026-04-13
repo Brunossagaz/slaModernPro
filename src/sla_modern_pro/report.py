@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Any
+from collections import Counter, defaultdict
 import csv
 
 from .client import ZabbixJsonRpcClient
@@ -76,6 +77,106 @@ class ReportService:
             if first_ack is None or ack_clock < first_ack:
                 first_ack = ack_clock
         return first_ack
+
+    def _build_alarm_analytics(
+        self,
+        events: list[dict[str, object]],
+        trigger_is_enabled: dict[str, bool],
+        trigger_descriptions: dict[str, str],
+        host_triggers_all: dict[str, list[str]],
+        host_names: dict[str, str],
+    ) -> dict[str, object]:
+        trigger_to_host: dict[str, str] = {}
+        for host_id, trigger_ids in host_triggers_all.items():
+            host_name = host_names.get(host_id, host_id)
+            for trigger_id in trigger_ids:
+                trigger_to_host.setdefault(trigger_id, host_name)
+
+        by_month: Counter[str] = Counter()
+        by_week: Counter[str] = Counter()
+        by_day_hour: Counter[tuple[str, str]] = Counter()
+        monthly_by_day: defaultdict[str, Counter[str]] = defaultdict(Counter)
+        monthly_by_week: defaultdict[str, Counter[str]] = defaultdict(Counter)
+        by_alarm_name: Counter[str] = Counter()
+        by_asset: Counter[str] = Counter()
+        detailed_log: list[dict[str, object]] = []
+
+        for event in events:
+            trigger_id = str(event.get("objectid", ""))
+            if not trigger_id or not trigger_is_enabled.get(trigger_id, True):
+                continue
+
+            value = int(str(event.get("value", 0)))
+            if value != 1:
+                continue
+
+            clock = int(str(event.get("clock", 0)))
+            dt = datetime.fromtimestamp(clock)
+            month_key = dt.strftime("%Y-%m")
+            day_key = dt.strftime("%Y-%m-%d")
+            hour_key = dt.strftime("%H:00")
+            iso_year, iso_week, _ = dt.isocalendar()
+            week_key = f"{iso_year}-W{iso_week:02d}"
+
+            trigger_desc = trigger_descriptions.get(trigger_id, trigger_id)
+            host_name = trigger_to_host.get(trigger_id, "N/A")
+
+            by_month[month_key] += 1
+            by_week[week_key] += 1
+            by_day_hour[(day_key, hour_key)] += 1
+            monthly_by_day[month_key][day_key] += 1
+            monthly_by_week[month_key][week_key] += 1
+            by_alarm_name[trigger_desc] += 1
+            by_asset[host_name] += 1
+
+            detailed_log.append(
+                {
+                    "event_id": str(event.get("eventid", "")),
+                    "time": self._fmt_ts(clock),
+                    "month": month_key,
+                    "week": week_key,
+                    "host": host_name,
+                    "alarm": trigger_desc,
+                    "trigger_id": trigger_id,
+                }
+            )
+
+        detailed_log.sort(key=lambda row: row["time"], reverse=True)
+
+        return {
+            "total_alarms": sum(by_month.values()),
+            "by_month": [
+                {"month": key, "count": by_month[key]}
+                for key in sorted(by_month.keys())
+            ],
+            "by_week": [
+                {"week": key, "count": by_week[key]}
+                for key in sorted(by_week.keys())
+            ],
+            "daily_by_hour": [
+                {"day": day, "hour": hour, "count": by_day_hour[(day, hour)]}
+                for day, hour in sorted(by_day_hour.keys())
+            ],
+            "monthly_by_day": [
+                {"month": month, "day": day, "count": counter[day]}
+                for month, counter in sorted(monthly_by_day.items())
+                for day in sorted(counter.keys())
+            ],
+            "monthly_by_week": [
+                {"month": month, "week": week, "count": counter[week]}
+                for month, counter in sorted(monthly_by_week.items())
+                for week in sorted(counter.keys())
+            ],
+            "common_alarms": [
+                {"alarm": alarm, "count": count}
+                for alarm, count in by_alarm_name.most_common(20)
+            ],
+            "problematic_assets": [
+                {"host": host, "count": count}
+                for host, count in by_asset.most_common(20)
+            ],
+            "detailed_log": detailed_log,
+        }
 
     def generate_group_report(
         self,
@@ -193,6 +294,24 @@ class ReportService:
                     "mttr_seconds": 0,
                     "mttr_fmt": "00:00:00",
                     "ack_supported": False,
+                },
+                "alarm_analytics": {
+                    "total_alarms": 0,
+                    "by_month": [],
+                    "by_week": [],
+                    "daily_by_hour": [],
+                    "monthly_by_day": [],
+                    "monthly_by_week": [],
+                    "common_alarms": [],
+                    "problematic_assets": [],
+                    "detailed_log": [],
+                },
+                "audit": {
+                    "events": [],
+                    "trigger_intervals": [],
+                    "merged_intervals": [],
+                    "skipped_hosts": skipped_hosts,
+                    "skipped_triggers": skipped_triggers,
                 },
             }
 
@@ -403,6 +522,13 @@ class ReportService:
 
         mtta_avg = int(sum(mtta_samples) / len(mtta_samples)) if mtta_samples else 0
         mttr_avg = int(sum(mttr_samples) / len(mttr_samples)) if mttr_samples else 0
+        alarm_analytics = self._build_alarm_analytics(
+            events=events,
+            trigger_is_enabled=trigger_is_enabled,
+            trigger_descriptions=trigger_descriptions,
+            host_triggers_all=host_triggers_all,
+            host_names=host_names,
+        )
 
         return {
             "group_id": group_id,
@@ -429,6 +555,7 @@ class ReportService:
                 "mttr_fmt": self.format_seconds(mttr_avg),
                 "ack_supported": ack_supported,
             },
+            "alarm_analytics": alarm_analytics,
             "audit": {
                 "events": audit_events_rows,
                 "trigger_intervals": audit_trigger_intervals_rows,
@@ -587,6 +714,87 @@ class ReportService:
                     row.get("trigger_id", ""),
                     row.get("trigger_description", ""),
                     row.get("reason", ""),
+                ])
+
+        return output_path
+
+    def export_analytics_csv(self, report: dict[str, object], output_path: str | Path) -> Path:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        start_ts = int(str(report.get("start_ts", 0)))
+        end_ts = int(str(report.get("end_ts", 0)))
+        start_label = datetime.fromtimestamp(start_ts).strftime("%d/%m/%Y %H:%M")
+        end_label = datetime.fromtimestamp(end_ts).strftime("%d/%m/%Y %H:%M")
+
+        analytics = report.get("alarm_analytics", {})
+        if not isinstance(analytics, dict):
+            analytics = {}
+
+        def _rows(key: str) -> list[dict[str, object]]:
+            value = analytics.get(key, [])
+            return value if isinstance(value, list) else []
+
+        with output_path.open("w", encoding="utf-8-sig", newline="") as handle:
+            writer = csv.writer(handle, delimiter=";")
+            writer.writerow(["ANALYTICS DE ALARMES DO HOSTGROUP"])
+            writer.writerow(["Grupo", str(report.get("group_name", report.get("group_id", "")))])
+            writer.writerow(["Periodo", f"{start_label} a {end_label}"])
+            writer.writerow(["Total de alarmes", str(analytics.get("total_alarms", 0))])
+            writer.writerow([])
+
+            writer.writerow(["ALARMES POR MES"])
+            writer.writerow(["Mes", "Qtde"])
+            for row in _rows("by_month"):
+                writer.writerow([row.get("month", ""), row.get("count", "")])
+            writer.writerow([])
+
+            writer.writerow(["ALARMES POR SEMANA"])
+            writer.writerow(["Semana", "Qtde"])
+            for row in _rows("by_week"):
+                writer.writerow([row.get("week", ""), row.get("count", "")])
+            writer.writerow([])
+
+            writer.writerow(["ALARMES POR DIA E HORA"])
+            writer.writerow(["Dia", "Hora", "Qtde"])
+            for row in _rows("daily_by_hour"):
+                writer.writerow([row.get("day", ""), row.get("hour", ""), row.get("count", "")])
+            writer.writerow([])
+
+            writer.writerow(["ALARMES POR MES E DIA"])
+            writer.writerow(["Mes", "Dia", "Qtde"])
+            for row in _rows("monthly_by_day"):
+                writer.writerow([row.get("month", ""), row.get("day", ""), row.get("count", "")])
+            writer.writerow([])
+
+            writer.writerow(["ALARMES POR MES E SEMANA"])
+            writer.writerow(["Mes", "Semana", "Qtde"])
+            for row in _rows("monthly_by_week"):
+                writer.writerow([row.get("month", ""), row.get("week", ""), row.get("count", "")])
+            writer.writerow([])
+
+            writer.writerow(["ALARMES MAIS COMUNS"])
+            writer.writerow(["Alarme", "Qtde"])
+            for row in _rows("common_alarms"):
+                writer.writerow([row.get("alarm", ""), row.get("count", "")])
+            writer.writerow([])
+
+            writer.writerow(["ATIVOS MAIS PROBLEMATICOS"])
+            writer.writerow(["Ativo", "Qtde"])
+            for row in _rows("problematic_assets"):
+                writer.writerow([row.get("host", ""), row.get("count", "")])
+            writer.writerow([])
+
+            writer.writerow(["LOG DETALHADO DE ALARMES"])
+            writer.writerow(["DataHora", "Mes", "Semana", "Host", "Alarme", "Event ID"])
+            for row in _rows("detailed_log"):
+                writer.writerow([
+                    row.get("time", ""),
+                    row.get("month", ""),
+                    row.get("week", ""),
+                    row.get("host", ""),
+                    row.get("alarm", ""),
+                    row.get("event_id", ""),
                 ])
 
         return output_path

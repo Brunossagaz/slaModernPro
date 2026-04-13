@@ -67,6 +67,7 @@ def _base_context(request: Request, **extra: Any) -> dict[str, Any]:
         "report": None,
         "download_id": None,
         "download_calc_id": None,
+        "download_analytics_id": None,
         "defaults": defaults,
         "form": {
             "url": "https://zabbix.suporte.compwire.com.br/api_jsonrpc.php",
@@ -158,11 +159,14 @@ def generate_report(
         report_id = uuid4().hex
         csv_path = REPORT_DIR / f"report_{report_id}.csv"
         calc_path = REPORT_DIR / f"report_{report_id}_base_calculo.csv"
+        analytics_path = REPORT_DIR / f"report_{report_id}_analytics.csv"
         service.export_csv(report, csv_path)
         service.export_calculation_csv(report, calc_path)
+        service.export_analytics_csv(report, analytics_path)
         REPORT_CACHE[report_id] = {
             "path": csv_path,
             "calc_path": calc_path,
+            "analytics_path": analytics_path,
             "created_at": datetime.now(),
             "group_id": group_id,
         }
@@ -199,9 +203,12 @@ def generate_report(
                     "selected_triggers": report.get("selected_triggers", []),
                     "matched_triggers": report.get("matched_triggers", []),
                     "problem_stats": report.get("problem_stats", {}),
+                    "alarm_analytics": report.get("alarm_analytics", {}),
+                    "audit": report.get("audit", {}),
                 },
                 download_id=report_id,
                 download_calc_id=report_id,
+                download_analytics_id=report_id,
                 form=form,
             ),
         )
@@ -233,6 +240,17 @@ def download_calculation_report(report_id: str) -> FileResponse:
     if not calc_path.exists():
         raise HTTPException(status_code=404, detail="Arquivo de base de cálculo não encontrado")
     return FileResponse(calc_path, filename=calc_path.name, media_type="text/csv")
+
+
+@app.get("/download-analytics/{report_id}")
+def download_analytics_report(report_id: str) -> FileResponse:
+    item = REPORT_CACHE.get(report_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Relatório não encontrado")
+    analytics_path = Path(item.get("analytics_path", ""))
+    if not analytics_path.exists():
+        raise HTTPException(status_code=404, detail="Arquivo de analytics não encontrado")
+    return FileResponse(analytics_path, filename=analytics_path.name, media_type="text/csv")
 
 
 @app.get("/health")

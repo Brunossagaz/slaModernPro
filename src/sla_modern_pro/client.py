@@ -102,7 +102,7 @@ class ZabbixJsonRpcClient:
         return self.call("hostgroup.get", {"output": ["groupid", "name"], "sortfield": "name"})
 
     def get_group_name(self, group_id: str) -> str:
-        result = self.call("hostgroup.get", {"groupids": [group_id], "output": ["name"]})
+        result = self.call("hostgroup.get", {"groupids": [int(group_id)], "output": ["name"]})
         if not result:
             raise RuntimeError(f"Host group not found: {group_id}")
         return str(result[0]["name"])
@@ -117,12 +117,12 @@ class ZabbixJsonRpcClient:
         )
         return [str(item["groupid"]) for item in result]
 
-    def get_group_tree_ids(self, group_id: str) -> tuple[str, list[str]]:
+    def get_group_tree_ids(self, group_id: str) -> tuple[str, list[int]]:
         group_name = self.get_group_name(group_id)
         subgroup_ids = self.get_subgroup_ids(group_name)
-        return group_name, [group_id, *subgroup_ids]
+        return group_name, [int(group_id), *[int(subgroup_id) for subgroup_id in subgroup_ids]]
 
-    def get_hosts(self, group_ids: list[str]) -> list[dict[str, Any]]:
+    def get_hosts(self, group_ids: list[int]) -> list[dict[str, Any]]:
         return self.call(
             "host.get",
             {

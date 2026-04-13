@@ -225,6 +225,62 @@ button.secondary {
   font-size: 0.98rem;
 }
 
+.tab-shell {
+  margin-top: 10px;
+}
+
+.tab-nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.tab-btn {
+  padding: 11px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(2, 6, 23, 0.4);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, #7dd3fc, #22c55e);
+  color: #06111f;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.download-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  margin: 22px 0 10px;
+  font-size: 1rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 10px 0 14px;
+}
+
 .table-wrap {
   overflow: auto;
   border-radius: 18px;
@@ -255,7 +311,6 @@ th {
 }
 
 .download {
-  margin-bottom: 14px;
   background: linear-gradient(135deg, #22c55e, #7dd3fc);
 }
 
@@ -266,7 +321,7 @@ th {
 }
 
 @media (max-width: 980px) {
-  .hero, .grid, .form-grid, .summary {
+  .hero, .grid, .form-grid, .summary, .analytics-grid {
     grid-template-columns: 1fr;
   }
 }

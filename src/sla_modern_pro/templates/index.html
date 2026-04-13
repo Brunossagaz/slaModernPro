@@ -74,63 +74,268 @@
 
       <section class="panel">
         <h2>Resultado</h2>
-        {% if download_id %}
-        <div class="actions">
-          <a class="download" href="/download/{{ download_id }}">Baixar CSV</a>
-          {% if download_calc_id %}
-          <a class="download secondary-download" href="/download-calculation/{{ download_calc_id }}">Baixar base de cálculo</a>
-          {% endif %}
-        </div>
-        {% endif %}
         {% if report %}
-        <div class="summary">
-          <div><span>Grupo</span><strong>{{ report.group_id }}</strong></div>
-            <div><span>Nome do grupo</span><strong>{{ report.group_name }}</strong></div>
-          <div><span>Período</span><strong>{{ report.start }} até {{ report.end }}</strong></div>
-          <div><span>Hosts</span><strong>{{ report.rows|length }}</strong></div>
-          <div><span>Duração total</span><strong>{{ report.total_period }} s</strong></div>
-          <div><span>Triggers selecionadas (filtro de disponibilidade)</span><strong>{{ report.selected_triggers|length }}</strong></div>
-          <div><span>Triggers aplicadas na disponibilidade</span><strong>{{ report.matched_triggers|length }}</strong></div>
+        <div class="tab-shell">
+          <div class="tab-nav" role="tablist" aria-label="Visões do relatório">
+            <button class="tab-btn active" type="button" data-tab="overview">Resumo</button>
+            <button class="tab-btn" type="button" data-tab="sla">SLA por Host</button>
+            <button class="tab-btn" type="button" data-tab="analytics">Analytics de Alarmes</button>
+            <button class="tab-btn" type="button" data-tab="audit">Base de Cálculo</button>
+          </div>
+
+          <div class="tab-content active" id="tab-overview">
+            <div class="download-row">
+              <a class="download" href="/download/{{ download_id }}">Baixar CSV</a>
+              {% if download_calc_id %}
+              <a class="download secondary-download" href="/download-calculation/{{ download_calc_id }}">Baixar base de cálculo</a>
+              {% endif %}
+              {% if download_analytics_id %}
+              <a class="download analytics-download" href="/download-analytics/{{ download_analytics_id }}">Baixar analytics</a>
+              {% endif %}
+            </div>
+
+            <div class="summary">
+              <div><span>Grupo</span><strong>{{ report.group_id }}</strong></div>
+              <div><span>Nome do grupo</span><strong>{{ report.group_name }}</strong></div>
+              <div><span>Período</span><strong>{{ report.start }} até {{ report.end }}</strong></div>
+              <div><span>Hosts</span><strong>{{ report.rows|length }}</strong></div>
+              <div><span>Duração total</span><strong>{{ report.total_period }} s</strong></div>
+              <div><span>Triggers selecionadas (filtro de disponibilidade)</span><strong>{{ report.selected_triggers|length }}</strong></div>
+              <div><span>Triggers aplicadas na disponibilidade</span><strong>{{ report.matched_triggers|length }}</strong></div>
+            </div>
+
+            <div class="alert info">
+              Disponibilidade (downtime/uptime) é calculada pelas triggers filtradas. MTTA/MTTR são calculados por host com base em todos os alertas do período (triggers habilitadas).
+            </div>
+
+            <div class="summary metrics-space">
+              <div><span>MTTA</span><strong>{{ report.problem_stats.mtta_fmt|default('00:00:00') }}</strong></div>
+              <div><span>MTTR</span><strong>{{ report.problem_stats.mttr_fmt|default('00:00:00') }}</strong></div>
+              <div><span>Problemas iniciados</span><strong>{{ report.problem_stats.problems_started|default(0) }}</strong></div>
+              <div><span>Problemas resolvidos</span><strong>{{ report.problem_stats.problems_resolved|default(0) }}</strong></div>
+              <div><span>Problemas com ACK</span><strong>{{ report.problem_stats.problems_with_ack|default(0) }}</strong></div>
+              <div><span>ACK API</span><strong>{% if report.problem_stats.ack_supported|default(false) %}Disponível{% else %}Indisponível{% endif %}</strong></div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-sla">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Host</th>
+                    <th>Downtime</th>
+                    <th>Uptime</th>
+                    <th>Disponibilidade</th>
+                    <th>MTTA</th>
+                    <th>MTTR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in report.rows %}
+                  <tr>
+                    <td>{{ row.host_name }}</td>
+                    <td>{{ row.downtime }}</td>
+                    <td>{{ row.uptime }}</td>
+                    <td>{{ row.availability }}</td>
+                    <td>{{ row.mtta }}</td>
+                    <td>{{ row.mttr }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-analytics">
+            <div class="summary">
+              <div><span>Total de alarmes no período</span><strong>{{ report.alarm_analytics.total_alarms|default(0) }}</strong></div>
+              <div><span>Semanas com ocorrências</span><strong>{{ report.alarm_analytics.by_week|default([])|length }}</strong></div>
+              <div><span>Meses com ocorrências</span><strong>{{ report.alarm_analytics.by_month|default([])|length }}</strong></div>
+              <div><span>Registros no log detalhado</span><strong>{{ report.alarm_analytics.detailed_log|default([])|length }}</strong></div>
+            </div>
+
+            <div class="analytics-grid">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th colspan="2">Quantidade de alarmes por mês</th></tr>
+                    <tr><th>Mês</th><th>Qtde</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for row in report.alarm_analytics.by_month|default([]) %}
+                    <tr><td>{{ row.month }}</td><td>{{ row.count }}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th colspan="2">Quantidade de alarmes por semana</th></tr>
+                    <tr><th>Semana</th><th>Qtde</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for row in report.alarm_analytics.by_week|default([]) %}
+                    <tr><td>{{ row.week }}</td><td>{{ row.count }}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="analytics-grid">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th colspan="3">Quantidade diária de alarmes por hora</th></tr>
+                    <tr><th>Dia</th><th>Hora</th><th>Qtde</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for row in report.alarm_analytics.daily_by_hour|default([]) %}
+                    <tr><td>{{ row.day }}</td><td>{{ row.hour }}</td><td>{{ row.count }}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th colspan="3">Quantidade mensal de alarmes por dia</th></tr>
+                    <tr><th>Mês</th><th>Dia</th><th>Qtde</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for row in report.alarm_analytics.monthly_by_day|default([]) %}
+                    <tr><td>{{ row.month }}</td><td>{{ row.day }}</td><td>{{ row.count }}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="analytics-grid">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th colspan="3">Quantidade mensal de alarmes por semana</th></tr>
+                    <tr><th>Mês</th><th>Semana</th><th>Qtde</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for row in report.alarm_analytics.monthly_by_week|default([]) %}
+                    <tr><td>{{ row.month }}</td><td>{{ row.week }}</td><td>{{ row.count }}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th colspan="2">Alarmes mais comuns (Top 20)</th></tr>
+                      <tr><th>Alarme</th><th>Qtde</th></tr>
+                    </thead>
+                    <tbody>
+                      {% for row in report.alarm_analytics.common_alarms|default([]) %}
+                      <tr><td>{{ row.alarm }}</td><td>{{ row.count }}</td></tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="table-wrap" style="margin-top: 12px;">
+                  <table>
+                    <thead>
+                      <tr><th colspan="2">Ativos mais problemáticos (Top 20)</th></tr>
+                      <tr><th>Ativo</th><th>Qtde</th></tr>
+                    </thead>
+                    <tbody>
+                      {% for row in report.alarm_analytics.problematic_assets|default([]) %}
+                      <tr><td>{{ row.host }}</td><td>{{ row.count }}</td></tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th colspan="6">Log detalhado de alarmes</th></tr>
+                  <tr>
+                    <th>Data/Hora</th>
+                    <th>Mês</th>
+                    <th>Semana</th>
+                    <th>Host</th>
+                    <th>Alarme</th>
+                    <th>Event ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% set detailed_log = report.alarm_analytics.detailed_log|default([]) %}
+                  {% for row in detailed_log[:500] %}
+                  <tr>
+                    <td>{{ row.time }}</td>
+                    <td>{{ row.month }}</td>
+                    <td>{{ row.week }}</td>
+                    <td>{{ row.host }}</td>
+                    <td>{{ row.alarm }}</td>
+                    <td>{{ row.event_id }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-audit">
+            {% set audit = report.audit|default({}) %}
+            <div class="alert info">
+              Base de cálculo, logs usados, intervalos por trigger e itens ignorados por validação.
+            </div>
+
+            <div class="summary">
+              <div><span>Itens ignorados (hosts)</span><strong>{{ audit.skipped_hosts|default([])|length }}</strong></div>
+              <div><span>Itens ignorados (triggers)</span><strong>{{ audit.skipped_triggers|default([])|length }}</strong></div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th colspan="4">Itens ignorados por validação</th></tr>
+                  <tr><th>Tipo</th><th>ID</th><th>Nome/Descrição</th><th>Motivo</th></tr>
+                </thead>
+                <tbody>
+                  {% for row in audit.skipped_hosts|default([]) %}
+                  <tr><td>host</td><td>{{ row.host_id }}</td><td>{{ row.host_name }}</td><td>{{ row.reason }}</td></tr>
+                  {% endfor %}
+                  {% for row in audit.skipped_triggers|default([]) %}
+                  <tr><td>trigger</td><td>{{ row.trigger_id }}</td><td>{{ row.trigger_description }}</td><td>{{ row.reason }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
-        <div class="alert info">
-          Disponibilidade (downtime/uptime) é calculada pelas triggers filtradas. MTTA/MTTR são calculados por host com base em todos os alertas do período (triggers habilitadas).
-        </div>
+        <script>
+          document.addEventListener('DOMContentLoaded', () => {
+            const buttons = document.querySelectorAll('.tab-btn');
+            const panels = document.querySelectorAll('.tab-content');
 
-        <div class="summary metrics-space">
-          <div><span>MTTA</span><strong>{{ report.problem_stats.mtta_fmt }}</strong></div>
-          <div><span>MTTR</span><strong>{{ report.problem_stats.mttr_fmt }}</strong></div>
-          <div><span>Problemas iniciados</span><strong>{{ report.problem_stats.problems_started }}</strong></div>
-          <div><span>Problemas resolvidos</span><strong>{{ report.problem_stats.problems_resolved }}</strong></div>
-          <div><span>Problemas com ACK</span><strong>{{ report.problem_stats.problems_with_ack }}</strong></div>
-          <div><span>ACK API</span><strong>{% if report.problem_stats.ack_supported %}Disponível{% else %}Indisponível{% endif %}</strong></div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Host</th>
-                <th>Downtime</th>
-                <th>Uptime</th>
-                <th>Disponibilidade</th>
-                <th>MTTA</th>
-                <th>MTTR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in report.rows %}
-              <tr>
-                <td>{{ row.host_name }}</td>
-                <td>{{ row.downtime }}</td>
-                <td>{{ row.uptime }}</td>
-                <td>{{ row.availability }}</td>
-                <td>{{ row.mtta }}</td>
-                <td>{{ row.mttr }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+            function activate(tabName) {
+              buttons.forEach((button) => button.classList.toggle('active', button.dataset.tab === tabName));
+              panels.forEach((panel) => panel.classList.toggle('active', panel.id === `tab-${tabName}`));
+            }
+
+            buttons.forEach((button) => {
+              button.addEventListener('click', () => activate(button.dataset.tab));
+            });
+          });
+        </script>
         {% else %}
         <p class="empty">Nenhum relatório gerado ainda.</p>
         {% endif %}

@@ -50,7 +50,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e .
 ```
-.
+
 ## Web app interno
 ```powershell
 sla-modern-pro-web

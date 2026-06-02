@@ -1,3 +1,33 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+eggs/
+*.egg
+
+# IDEs and OS files
+.vscode/
+.pytest_cache/
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.log
+
+# Project-specific
+src/sla_modern_pro.egg-info/
 __pycache__/
 .venv/
 .pytest_cache/

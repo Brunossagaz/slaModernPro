@@ -25,6 +25,21 @@ class ReportService:
         self.client = client
 
     @staticmethod
+    def _severity_label(priority: object) -> str:
+        severity_map = {
+            0: "Not Classified",
+            1: "Information",
+            2: "Warning",
+            3: "Average",
+            4: "High",
+            5: "Critical",
+        }
+        try:
+            return severity_map.get(int(str(priority)), "Unknown")
+        except (TypeError, ValueError):
+            return "Unknown"
+
+    @staticmethod
     def chunked(values: list[str], size: int) -> Iterable[list[str]]:
         for index in range(0, len(values), size):
             yield values[index:index + size]
@@ -83,6 +98,7 @@ class ReportService:
         events: list[dict[str, object]],
         trigger_is_enabled: dict[str, bool],
         trigger_descriptions: dict[str, str],
+        trigger_severities: dict[str, str],
         host_triggers_all: dict[str, list[str]],
         host_names: dict[str, str],
     ) -> dict[str, object]:
@@ -137,6 +153,7 @@ class ReportService:
                     "week": week_key,
                     "host": host_name,
                     "alarm": trigger_desc,
+                    "severity": trigger_severities.get(trigger_id, "Desconhecida"),
                     "trigger_id": trigger_id,
                 }
             )
@@ -231,6 +248,7 @@ class ReportService:
         all_trigger_ids_all: list[str] = sorted({trigger_id for ids in host_triggers_all.values() for trigger_id in ids})
 
         trigger_is_enabled: dict[str, bool] = {}
+        trigger_severities: dict[str, str] = {}
         skipped_triggers: list[dict[str, str]] = []
 
         for trigger_batch in self.chunked(all_trigger_ids_all, 200):
@@ -241,6 +259,7 @@ class ReportService:
                     continue
 
                 trigger_desc = trigger_descriptions.get(trigger_id, str(detail.get("description", "")))
+                trigger_severities[trigger_id] = self._severity_label(detail.get("priority", ""))
                 trigger_disabled = int(str(detail.get("status", 0))) != 0
                 items = detail.get("items", [])
                 has_disabled_item = False
@@ -526,6 +545,7 @@ class ReportService:
             events=events,
             trigger_is_enabled=trigger_is_enabled,
             trigger_descriptions=trigger_descriptions,
+            trigger_severities=trigger_severities,
             host_triggers_all=host_triggers_all,
             host_names=host_names,
         )
@@ -786,7 +806,7 @@ class ReportService:
             writer.writerow([])
 
             writer.writerow(["LOG DETALHADO DE ALARMES"])
-            writer.writerow(["DataHora", "Mes", "Semana", "Host", "Alarme", "Event ID"])
+            writer.writerow(["DataHora", "Mes", "Semana", "Host", "Alarme", "Severidade", "Event ID"])
             for row in _rows("detailed_log"):
                 writer.writerow([
                     row.get("time", ""),
@@ -794,6 +814,7 @@ class ReportService:
                     row.get("week", ""),
                     row.get("host", ""),
                     row.get("alarm", ""),
+                    row.get("severity", ""),
                     row.get("event_id", ""),
                 ])
 

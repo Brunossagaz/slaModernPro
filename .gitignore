@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Python cache and compiled files
 __pycache__/
 *.py[cod]
@@ -28,6 +29,8 @@ Thumbs.db
 
 # Project-specific
 src/sla_modern_pro.egg-info/
+=======
+>>>>>>> 52b9b90089a0a326371787599a395e9ef12ef691
 __pycache__/
 .venv/
 .pytest_cache/

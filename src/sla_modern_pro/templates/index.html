@@ -264,13 +264,14 @@
             <div class="table-wrap">
               <table>
                 <thead>
-                  <tr><th colspan="6">Log detalhado de alarmes</th></tr>
+                  <tr><th colspan="7">Log detalhado de alarmes</th></tr>
                   <tr>
                     <th>Data/Hora</th>
                     <th>Mês</th>
                     <th>Semana</th>
                     <th>Host</th>
                     <th>Alarme</th>
+                    <th>Severidade</th>
                     <th>Event ID</th>
                   </tr>
                 </thead>
@@ -283,6 +284,7 @@
                     <td>{{ row.week }}</td>
                     <td>{{ row.host }}</td>
                     <td>{{ row.alarm }}</td>
+                    <td>{{ row.severity }}</td>
                     <td>{{ row.event_id }}</td>
                   </tr>
                   {% endfor %}

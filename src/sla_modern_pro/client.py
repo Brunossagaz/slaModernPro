@@ -140,7 +140,7 @@ class ZabbixJsonRpcClient:
             "trigger.get",
             {
                 "triggerids": trigger_ids,
-                "output": ["triggerid", "status", "description"],
+                "output": ["triggerid", "status", "description", "priority"],
                 "selectItems": ["itemid", "name", "status"],
             },
         )

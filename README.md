@@ -45,7 +45,7 @@ Aplicação interna para geração de relatórios SLA do Zabbix com foco em conf
 
 ## Execução
 ```powershell
-cd "C:\Users\bruno.sagaz\OneDrive - compwire.com.br\Documentos\Scripts\Relatórios\Desenvolvendo\slaModernPro"
+cd "slaModernPro"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e .

@@ -1,0 +1,25 @@
+Resumo dos arquivos do projeto SLA Modern Pro
+
+Raiz do projeto:
+- pyproject.toml: Metadados do projeto e configuração de empacotamento (dependências, versão, entrada).
+- pyrightconfig.json: Configuração do Pyright para checagem estática de tipos.
+- README.md: Descrição do projeto e instruções de uso.
+- requirements.txt: Lista de dependências (pode ser usada para ambientes virtuais).
+- slaModern.code-workspace: Configurações do workspace do VS Code.
+- .gitignore: Padrões de arquivos a serem ignorados pelo Git.
+
+Pacote principal (`src/sla_modern_pro`):
+- __init__.py: Inicializa o pacote Python.
+- cli.py: Interface de linha de comando; parseia argumentos e aciona a geração de relatórios.
+- client.py: Cliente JSON-RPC para comunicação com o Zabbix (autenticação, chamadas, retry).
+- report.py: Lógica de geração de relatórios SLA, transformação em linhas e exportação CSV.
+- web.py: Aplicação FastAPI que expõe UI e endpoints para carregar grupos, gerar relatórios e baixar CSVs.
+- static/styles.css: Estilos CSS utilizados pela interface web.
+- templates/index.html: Template Jinja2 da página principal da interface web.
+
+Testes:
+- tests/conftest.py: Fixtures e configuração compartilhada para testes (pytest).
+- tests/test_report.py: Testes unitários para a lógica de relatórios.
+
+Observações operacionais:
+- Arquivos gerados/temporários como `.venv/` e `*.egg-info/` foram removidos do repositório e adicionados ao `.gitignore`.

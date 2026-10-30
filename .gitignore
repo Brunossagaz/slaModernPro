@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Python cache and compiled files
 __pycache__/
 *.py[cod]
@@ -10,6 +9,8 @@ venv/
 ENV/
 env/
 .env
+.env.*
+!.env.example
 
 # Distribution / packaging
 build/
@@ -29,11 +30,6 @@ Thumbs.db
 
 # Project-specific
 src/sla_modern_pro.egg-info/
-=======
->>>>>>> 52b9b90089a0a326371787599a395e9ef12ef691
-__pycache__/
-.venv/
-.pytest_cache/
-dist/
-build/
-*.egg-info/
+
+# Ajustes locais do compose (ex.: rede do Zabbix local)
+docker-compose.override.yml

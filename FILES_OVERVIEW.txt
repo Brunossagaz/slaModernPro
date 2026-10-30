@@ -1,10 +1,15 @@
 Resumo dos arquivos do projeto SLA Modern Pro
 
 Raiz do projeto:
+- Dockerfile: Imagem da aplicação (multi-stage, usuário não-root, sem pip na imagem final).
+- docker-compose.yml: Sobe a aplicação em http://localhost:8000 com as restrições de segurança.
+- .env.example: Modelo de configuração; copie para .env e ajuste (o .env fica fora do git).
+- .dockerignore: Arquivos que não entram no contexto de build da imagem.
 - pyproject.toml: Metadados do projeto e configuração de empacotamento (dependências, versão, entrada).
+- requirements.txt: Dependências diretas.
+- requirements-lock.txt: Dependências pinadas usadas no build da imagem.
 - pyrightconfig.json: Configuração do Pyright para checagem estática de tipos.
 - README.md: Descrição do projeto e instruções de uso.
-- requirements.txt: Lista de dependências (pode ser usada para ambientes virtuais).
 - slaModern.code-workspace: Configurações do workspace do VS Code.
 - .gitignore: Padrões de arquivos a serem ignorados pelo Git.
 
@@ -12,15 +17,23 @@ Pacote principal (`src/sla_modern_pro`):
 - __init__.py: Inicializa o pacote Python.
 - cli.py: Interface de linha de comando; parseia argumentos e aciona a geração de relatórios.
 - client.py: Cliente JSON-RPC para comunicação com o Zabbix (autenticação, chamadas, retry).
-- report.py: Lógica de geração de relatórios SLA, transformação em linhas e exportação CSV.
+- config.py: Leitura das variáveis de ambiente (SLA_*).
+- security.py: Sessões, validação de URL do Zabbix, CSRF/Host e cabeçalhos de segurança.
+- forms.py: Validação dos campos dos formulários (Pydantic).
+- csv_utils.py: Escrita de CSV com proteção contra injeção de fórmula.
+- report.py: Lógica de geração de relatórios SLA/MTTA/MTTR, analytics e exportação CSV.
+- state_report.py: Tempo por estado dos itens (aba Status de Cluster).
 - web.py: Aplicação FastAPI que expõe UI e endpoints para carregar grupos, gerar relatórios e baixar CSVs.
 - static/styles.css: Estilos CSS utilizados pela interface web.
+- static/app.js: Comportamento da interface (sem script inline, por causa da CSP).
 - templates/index.html: Template Jinja2 da página principal da interface web.
 
-Testes:
-- tests/conftest.py: Fixtures e configuração compartilhada para testes (pytest).
-- tests/test_report.py: Testes unitários para a lógica de relatórios.
+Testes (`tests/`):
+- conftest.py: Fixtures e configuração compartilhada (pytest).
+- test_client.py: Cliente Zabbix (retry, lotes, fallbacks).
+- test_report.py: Regras de cálculo do relatório.
+- test_state_report.py: Tempo por estado.
+- test_security.py: Controles de segurança da aplicação web.
 
 Observações operacionais:
-- Arquivos gerados/temporários como `.venv/` e `*.egg-info/` foram removidos do repositório e adicionados ao `.gitignore`.
-.....
+- Arquivos gerados/temporários como `.venv/` e `*.egg-info/` ficam fora do repositório (`.gitignore`).

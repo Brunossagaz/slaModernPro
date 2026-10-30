@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Any
 from collections import Counter, defaultdict
-import csv
+from . import csv_utils
 
 from .client import ZabbixJsonRpcClient
 
@@ -32,7 +32,7 @@ class ReportService:
             2: "Warning",
             3: "Average",
             4: "High",
-            5: "Critical",
+            5: "Disaster",
         }
         try:
             return severity_map.get(int(str(priority)), "Unknown")
@@ -594,7 +594,7 @@ class ReportService:
         end_label = datetime.fromtimestamp(end_ts).strftime("%d/%m/%Y %H:%M")
 
         with output_path.open("w", encoding="utf-8-sig", newline="") as handle:
-            writer = csv.writer(handle, delimiter=";")
+            writer = csv_utils.writer(handle, delimiter=";")
             writer.writerow(["Período", f"{start_label} a {end_label}"])
             problem_stats = report.get("problem_stats", {})
             if isinstance(problem_stats, dict):
@@ -653,7 +653,7 @@ class ReportService:
             skipped_triggers_rows = []
 
         with output_path.open("w", encoding="utf-8-sig", newline="") as handle:
-            writer = csv.writer(handle, delimiter=";")
+            writer = csv_utils.writer(handle, delimiter=";")
             selected_triggers_raw = report.get("selected_triggers", [])
             selected_triggers_text = ""
             if isinstance(selected_triggers_raw, list):
@@ -756,7 +756,7 @@ class ReportService:
             return value if isinstance(value, list) else []
 
         with output_path.open("w", encoding="utf-8-sig", newline="") as handle:
-            writer = csv.writer(handle, delimiter=";")
+            writer = csv_utils.writer(handle, delimiter=";")
             writer.writerow(["ANALYTICS DE ALARMES DO HOSTGROUP"])
             writer.writerow(["Grupo", str(report.get("group_name", report.get("group_id", "")))])
             writer.writerow(["Periodo", f"{start_label} a {end_label}"])

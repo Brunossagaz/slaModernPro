@@ -31,31 +31,34 @@
         <div class="alert error">{{ error }}</div>
         {% endif %}
 
-        <form method="post" action="/groups" class="form-grid">
-          <label>
+        <form method="post" action="/report" class="form-grid" id="main-form" data-connected="{{ '1' if connected else '0' }}">
+          <label class="full-width">
             <span>URL da API</span>
-            <input type="text" name="url" value="{{ form.url }}" required>
+            <input type="text" name="url" value="{{ form.url }}" data-connection required>
           </label>
           <label>
             <span>Usuário</span>
-            <input type="text" name="user" value="{{ form.user }}" required>
+            <input type="text" name="user" value="{{ form.user }}" autocomplete="username" data-connection required>
           </label>
           <label>
             <span>Senha</span>
-            <input type="password" name="password" value="{{ form.password }}" required>
+            <input type="password" name="password" value="" autocomplete="current-password" data-connection {% if not connected %}required{% endif %}>
           </label>
-          <label>
-            <span>Grupo</span>
-            <input type="text" name="group_id" value="{{ form.group_id }}" list="groups" placeholder="Digite ou carregue os grupos" required>
-            <datalist id="groups">
-              {% for group in groups %}
-              <option value="{{ group.groupid }}" label="{{ group.name }}"></option>
-              {% endfor %}
-            </datalist>
-          </label>
+          <div class="connect-row full-width">
+            <button type="button" class="secondary" id="connect-btn">Conectar</button>
+            <button type="button" class="secondary" id="logout-btn" {% if not connected %}hidden{% endif %}>Desconectar</button>
+            <span class="connect-status" id="connect-status" role="status" aria-live="polite"></span>
+          </div>
           <label class="full-width">
-            <span>Triggers específicas (opcional)</span>
-            <textarea name="trigger_names" rows="3" placeholder="Uma por linha, ou separadas por vírgula/ponto e vírgula">{{ form.trigger_names }}</textarea>
+            <span>Grupo</span>
+            <input type="search" id="group-filter" placeholder="Filtrar grupos pelo nome" autocomplete="off" disabled>
+            <select name="group_id" id="group-select" required>
+              {% if form.group_id %}
+              <option value="{{ form.group_id }}" selected>{{ form.group_id }}</option>
+              {% else %}
+              <option value="">Conecte para carregar os grupos</option>
+              {% endif %}
+            </select>
           </label>
           <label>
             <span>Início</span>
@@ -65,9 +68,44 @@
             <span>Fim</span>
             <input type="datetime-local" name="end" value="{{ form.end }}" required>
           </label>
-          <div class="actions full-width">
-            <button type="submit" class="secondary">Carregar grupos</button>
-            <button type="submit" formaction="/report">Gerar relatório</button>
+
+          <div class="tab-shell full-width" data-initial="{{ form.mode }}">
+            <div class="tab-nav" role="tablist" aria-label="Tipo de relatório">
+              <button class="tab-btn active" type="button" data-tab="mode-sla">Relatório SLA</button>
+              <button class="tab-btn" type="button" data-tab="mode-state">Status de Cluster</button>
+            </div>
+
+            <div class="tab-content active" id="tab-mode-sla">
+              <div class="form-grid">
+                <label class="full-width">
+                  <span>Triggers específicas (opcional)</span>
+                  <textarea name="trigger_names" rows="3" placeholder="Uma por linha, ou separadas por vírgula/ponto e vírgula">{{ form.trigger_names }}</textarea>
+                </label>
+                <div class="actions full-width">
+                  <button type="submit" formaction="/report" data-loading="Gerando relatório SLA">Gerar relatório SLA</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-content" id="tab-mode-state">
+              <div class="form-grid">
+                <label class="full-width">
+                  <span>Chave do item de status</span>
+                  <textarea name="item_keys" rows="3" placeholder="Uma por linha. Aceita * como curinga, ex.: cloudera.service.health[*]">{{ form.item_keys }}</textarea>
+                </label>
+                <label>
+                  <span>Tolerância sem dados (min)</span>
+                  <input type="number" name="max_gap_minutes" value="{{ form.max_gap_minutes }}" min="1" step="1">
+                </label>
+                <p class="hint">
+                  Cada valor coletado vale até o próximo. Se o item ficar mais que a tolerância sem coletar,
+                  o trecho conta como SEM DADOS. Use um valor maior que o intervalo de coleta do item.
+                </p>
+                <div class="actions full-width">
+                  <button type="submit" formaction="/state-report" data-loading="Gerando relatório de status">Gerar relatório de status</button>
+                </div>
+              </div>
+            </div>
           </div>
         </form>
       </section>
@@ -323,26 +361,168 @@
           </div>
         </div>
 
-        <script>
-          document.addEventListener('DOMContentLoaded', () => {
-            const buttons = document.querySelectorAll('.tab-btn');
-            const panels = document.querySelectorAll('.tab-content');
+        {% elif state_report %}
+        {% set sr = state_report %}
+        <div class="tab-shell">
+          <div class="tab-nav" role="tablist" aria-label="Visões do relatório de status">
+            <button class="tab-btn active" type="button" data-tab="state-overview">Resumo</button>
+            <button class="tab-btn" type="button" data-tab="state-items">Tempo por item</button>
+            <button class="tab-btn" type="button" data-tab="state-intervals">Intervalos</button>
+          </div>
 
-            function activate(tabName) {
-              buttons.forEach((button) => button.classList.toggle('active', button.dataset.tab === tabName));
-              panels.forEach((panel) => panel.classList.toggle('active', panel.id === `tab-${tabName}`));
-            }
+          <div class="tab-content active" id="tab-state-overview">
+            <div class="download-row">
+              <a class="download" href="/download-state/{{ state_download_id }}">Baixar CSV</a>
+              <a class="download secondary-download" href="/download-state-intervals/{{ state_download_id }}">Baixar intervalos</a>
+            </div>
 
-            buttons.forEach((button) => {
-              button.addEventListener('click', () => activate(button.dataset.tab));
-            });
-          });
-        </script>
+            <div class="summary">
+              <div><span>Nome do grupo</span><strong>{{ sr.group_name }}</strong></div>
+              <div><span>Itens analisados</span><strong>{{ sr.rows|length }}</strong></div>
+              <div><span>Período</span><strong>{{ sr.start }} até {{ sr.end }}</strong></div>
+              <div><span>Duração calculada</span><strong>{{ sr.total_period_fmt }}</strong></div>
+              <div><span>Tolerância sem dados</span><strong>{{ sr.max_gap_fmt }}</strong></div>
+              <div><span>Itens ignorados</span><strong>{{ sr.skipped|length }}</strong></div>
+            </div>
+
+            {% if sr.clipped %}
+            <div class="alert info">O fim do período está no futuro; o cálculo vai até {{ sr.effective_end }}.</div>
+            {% endif %}
+            {% for warning in sr.warnings %}
+            <div class="alert warn">{{ warning }}</div>
+            {% endfor %}
+
+            <h3 class="section-title">Tempo total por estado (soma dos itens)</h3>
+            {% if sr.rows %}
+            <div class="state-bar state-bar-lg" aria-hidden="true">
+              {% for cell in sr.totals %}{% if cell.pct > 0 %}<span class="tone-{{ cell.tone }}" style="width: {{ '%.4f'|format(cell.pct) }}%" title="{{ cell.state }}: {{ cell.pct_fmt }}"></span>{% endif %}{% endfor %}
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Estado</th><th>Tempo</th><th>% do período</th></tr></thead>
+                <tbody>
+                  {% for cell in sr.totals %}
+                  <tr>
+                    <td><span class="state-chip tone-{{ cell.tone }}"></span>{{ cell.state }}</td>
+                    <td>{{ cell.fmt }}</td>
+                    <td>{{ cell.pct_fmt }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p class="empty">Nenhum item ativo encontrado com as chaves informadas.</p>
+            {% endif %}
+
+            {% if sr.skipped %}
+            <div class="table-wrap" style="margin-top: 12px;">
+              <table>
+                <thead>
+                  <tr><th colspan="3">Itens ignorados por validação</th></tr>
+                  <tr><th>Host</th><th>Item</th><th>Motivo</th></tr>
+                </thead>
+                <tbody>
+                  {% for row in sr.skipped %}
+                  <tr><td>{{ row.host_name }}</td><td>{{ row.item_name }}</td><td>{{ row.reason }}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="tab-content" id="tab-state-items">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Host</th>
+                    <th>Item</th>
+                    <th>Distribuição</th>
+                    {% for state in sr.states %}<th>{{ state }}</th>{% endfor %}
+                    <th>Cobertura</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in sr.rows %}
+                  <tr>
+                    <td>{{ row.host_name }}</td>
+                    <td>{{ row.item_name }}</td>
+                    <td class="bar-cell">
+                      <div class="state-bar" aria-hidden="true">
+                        {% for cell in row.cells %}{% if cell.pct > 0 %}<span class="tone-{{ cell.tone }}" style="width: {{ '%.4f'|format(cell.pct) }}%" title="{{ cell.state }}: {{ cell.pct_fmt }}"></span>{% endif %}{% endfor %}
+                      </div>
+                    </td>
+                    {% for cell in row.cells %}
+                    <td class="nowrap">
+                      {% if cell.seconds or cell.samples %}{{ cell.fmt }}<br><small class="muted">{{ cell.pct_fmt }}{% if cell.samples %} · {{ cell.samples }} {{ 'coleta' if cell.samples == 1 else 'coletas' }}{% endif %}</small>{% else %}<span class="muted">—</span>{% endif %}
+                    </td>
+                    {% endfor %}
+                    <td>{{ row.coverage }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-state-intervals">
+            <label class="inline-check">
+              <input type="checkbox" id="hide-good" checked>
+              <span>Ocultar intervalos em GOOD</span>
+            </label>
+            {% if sr.interval_count > sr.max_intervals %}
+            <div class="alert info">Mostrando os primeiros {{ sr.max_intervals }} de {{ sr.interval_count }} intervalos. O CSV de intervalos tem a lista completa.</div>
+            {% endif %}
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Host</th><th>Item</th><th>Estado</th><th>Início</th><th>Fim</th><th>Duração</th></tr>
+                </thead>
+                <tbody id="interval-rows">
+                  {% for row in sr.intervals %}
+                  <tr data-state="{{ row.state }}">
+                    <td>{{ row.host_name }}</td>
+                    <td>{{ row.item_name }}</td>
+                    <td>{{ row.state }}</td>
+                    <td>{{ row.interval_start }}</td>
+                    <td>{{ row.interval_end }}</td>
+                    <td>{{ row.duration_fmt }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
         {% else %}
         <p class="empty">Nenhum relatório gerado ainda.</p>
         {% endif %}
       </section>
     </main>
   </div>
+
+  <dialog class="loading-modal" id="loading-modal" aria-labelledby="loading-title" aria-describedby="loading-desc">
+    <div class="loading-modal-header">
+      <div class="spinner" aria-hidden="true"></div>
+      <div>
+        <p class="eyebrow">Processando</p>
+        <h2 id="loading-title">Gerando relatório</h2>
+      </div>
+    </div>
+    <p id="loading-desc" class="loading-desc">
+      Consultando o Zabbix. Dependendo do grupo e do período, pode levar alguns minutos.
+    </p>
+    <div class="progress-track" aria-hidden="true"><span></span></div>
+    <dl class="loading-details">
+      <div><dt>Grupo</dt><dd id="loading-group">—</dd></div>
+      <div><dt>Período</dt><dd id="loading-period">—</dd></div>
+      <div><dt>Tempo decorrido</dt><dd><b id="loading-elapsed" role="timer">00:00</b></dd></div>
+    </dl>
+    <p class="loading-note">Não feche nem recarregue a página até o resultado aparecer.</p>
+  </dialog>
+
+  <script src="/static/app.js" defer></script>
 </body>
 </html>

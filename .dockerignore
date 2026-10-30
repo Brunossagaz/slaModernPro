@@ -1,0 +1,40 @@
+# Version control
+.git/
+.github/
+
+# Python environments / caches
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# Editors / OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Configuração local com dados do ambiente: nunca entra na imagem
+.env
+.env.*
+
+# Tests (not needed at runtime)
+tests/
+
+# Docker / compose files (not needed inside the build context copy)
+Dockerfile*
+docker-compose*.yml
+
+# Misc project files not needed in the image
+# (README.md is NOT ignored: pyproject.toml declares readme = "README.md",
+# so setuptools needs it present during `pip install .` in the builder stage)
+*.zip
+*.log
+slaModern.code-workspace
+FILES_OVERVIEW.txt
+pyrightconfig.json
